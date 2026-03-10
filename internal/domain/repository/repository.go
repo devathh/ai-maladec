@@ -13,4 +13,7 @@ type Repository interface {
 	CreateDir(ctx context.Context, dir string) error
 	DeleteDir(ctx context.Context, dir string) error
 	ReadDir(ctx context.Context, dir string) ([]string, error)
+
+	// System Commands
+	ExecCommand(ctx context.Context, command string, args ...string) (string, error)
 }

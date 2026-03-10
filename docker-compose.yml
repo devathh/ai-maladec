@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  xcoder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: xcoder-app
+    environment:
+      - AI_API_URL=http://host.docker.internal:3264/api/chat/completions
+      - AI_MODEL=qwen3.5-397b-a17b
+      - APP_ENV=prod
+      - LOG_LEVEL=info
+      - MAX_RETRIES=3
+      - CONTEXT_SIZE=20
+    volumes:
+      # Mount current directory to allow file operations on host
+      - .:/root/project
+    working_dir: /root/project
+    stdin_open: true
+    tty: true
+    # Network mode host allows accessing localhost services on host machine
+    # Alternatively use host.docker.internal in env vars
+    network_mode: "host"

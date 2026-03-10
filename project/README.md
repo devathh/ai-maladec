@@ -1,3 +1,0 @@
-# Project
-
-New project initialized.

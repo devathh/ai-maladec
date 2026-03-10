@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"time"
 
 	"github.com/devathh/xcoder/internal/domain/ai"
 )
@@ -25,13 +27,18 @@ type Response struct {
 
 type AiRepository struct {
 	model  string
+	url    string
 	client *http.Client
 }
 
-func New(model string, client *http.Client) *AiRepository {
+// New создает репозиторий с явным URL и таймаутом
+func New(model string, apiURL string, timeout time.Duration) *AiRepository {
 	return &AiRepository{
-		model:  model,
-		client: client,
+		model: model,
+		url:   apiURL,
+		client: &http.Client{
+			Timeout: timeout,
+		},
 	}
 }
 
@@ -45,9 +52,12 @@ func (ar *AiRepository) SendMsg(ctx context.Context, msgs []*ai.Message) (*ai.Me
 		Messages: msgs,
 	}
 
-	jsonBytes, _ := json.Marshal(reqBody)
+	jsonBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", "http://localhost:3264/api/chat/completions", bytes.NewBuffer(jsonBytes))
+	req, err := http.NewRequestWithContext(ctx, "POST", ar.url, bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create req: %w", err)
 	}
@@ -60,8 +70,13 @@ func (ar *AiRepository) SendMsg(ctx context.Context, msgs []*ai.Message) (*ai.Me
 	}
 	defer resp.Body.Close()
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
 	var response Response
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	if err := json.Unmarshal(body, &response); err != nil {
 		return nil, fmt.Errorf("failed to decode json: %w", err)
 	}
 
@@ -69,7 +84,9 @@ func (ar *AiRepository) SendMsg(ctx context.Context, msgs []*ai.Message) (*ai.Me
 		return nil, fmt.Errorf("invalid len of choices")
 	}
 
-	return &ai.Message{
-		Content: response.Choices[0].Message.Content,
-	}, nil
+	if response.Choices[0].Message.Content == "" {
+		return nil, fmt.Errorf("invalid response from ai")
+	}
+
+	return ai.NewMessage(ai.RoleAssistant, response.Choices[0].Message.Content), nil
 }
