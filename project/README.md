@@ -1,0 +1,3 @@
+# Project
+
+New project initialized.
